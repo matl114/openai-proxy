@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import json
 import time
-from datetime import datetime
+from contextlib import asynccontextmanager
 
 import httpx
 from fastapi import FastAPI, Request, HTTPException
@@ -15,8 +15,20 @@ proxied_hosts = PathMatchingTree({
     "/backend-api/conversation": "https://chat.openai.com",
 })
 
+
+# httpx client that is managed by the application's lifespan
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # on startup
+    yield
+    # on shutdown
+    await client.aclose()
+
+
+client = httpx.AsyncClient()
+
 # FastAPI app
-app = FastAPI()
+app = FastAPI(lifespan=lifespan)
 
 
 async def proxy_openai_api(request: Request):
@@ -25,9 +37,7 @@ async def proxy_openai_api(request: Request):
                k not in {'host', 'content-length', 'x-forwarded-for', 'x-real-ip', 'connection'}}
     url = f'{proxied_hosts.get_matching(request.url.path)}{request.url.path}'
 
-    start_time = datetime.now().microsecond
-    # create httpx async client
-    client = httpx.AsyncClient()
+    start_time_in_secs = time.time()
 
     request_body = await request.json() if request.method in {'POST', 'PUT'} else None
 
@@ -50,8 +60,7 @@ async def proxy_openai_api(request: Request):
                 # gather log data
                 log.request_url = url
                 log.request_method = request.method
-                log.request_time = start_time
-                log.response_time = time.time() - start_time
+                log.request_time = int(start_time_in_secs * 1000)
                 log.status_code = res.status_code
                 log.request_content = json.dumps(request_body, ensure_ascii=False) if request_body else None
                 log.response_content = content.decode('utf-8')
@@ -62,7 +71,7 @@ async def proxy_openai_api(request: Request):
 
     async def update_log():
         nonlocal log
-        log.response_time = datetime.now().microsecond - start_time
+        log.response_duration = time.time() - start_time_in_secs
         await save_log(log)
 
     response = OverrideStreamResponse(stream_api_response(), background=BackgroundTask(update_log))

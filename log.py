@@ -18,13 +18,21 @@ class OpenAILog(Base):
     __tablename__ = 'openai_logs'
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    # request url
     request_url = Column(String)
+    # request method
     request_method = Column(String)
+    # request time, timestamp in millisecond
     request_time = Column(BigInteger)
-    response_time = Column(BigInteger)
+    # response duration, in seconds
+    response_duration = Column(BigInteger)
+    # response status code
     status_code = Column(Integer)
+    # request content
     request_content = Column(String)
+    # response header
     response_header = Column(String)
+    # response content
     response_content = Column(String)
 
     def to_dict(self):
@@ -33,7 +41,7 @@ class OpenAILog(Base):
             'request_url': self.request_url,
             'request_method': self.request_method,
             'request_time': self.request_time,
-            'response_time': self.response_time,
+            'response_duration': self.response_duration,
             'status_code': self.status_code,
             'request_content': self.request_content,
             'response_header': self.response_header,
