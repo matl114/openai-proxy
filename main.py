@@ -7,19 +7,19 @@ import httpx
 from fastapi import FastAPI, Request, HTTPException
 from starlette.background import BackgroundTask
 
-from log import OpenAILog, save_log
+from log import OpenAILog, save_log, create_tables
 from utils import PathMatchingTree, OverrideStreamResponse
 
-proxied_hosts = PathMatchingTree({
-    "/": "https://api.openai.com",
-    "/backend-api/conversation": "https://chat.openai.com",
-})
+with open('config.json') as f:
+    config = json.load(f)
+proxied_hosts = PathMatchingTree(config['proxied_hosts'])
 
 
 # httpx client that is managed by the application's lifespan
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # on startup
+    await create_tables()
     yield
     # on shutdown
     await client.aclose()
@@ -39,7 +39,10 @@ async def proxy_openai_api(request: Request):
 
     start_time_in_secs = time.time()
 
-    request_body = await request.json() if request.method in {'POST', 'PUT'} else None
+    try:
+        request_body = await request.json() if request.method in {'POST', 'PUT'} else None
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail='Invalid JSON body')
 
     log = OpenAILog()
 
@@ -63,7 +66,7 @@ async def proxy_openai_api(request: Request):
                 log.request_time = int(start_time_in_secs * 1000)
                 log.status_code = res.status_code
                 log.request_content = json.dumps(request_body, ensure_ascii=False) if request_body else None
-                log.response_content = content.decode('utf-8')
+                log.response_content = content.decode('utf-8', errors='ignore')
                 log.response_header = json.dumps([[k, v] for k, v in res.headers.items()])
 
         except httpx.RequestError as exc:
@@ -71,8 +74,12 @@ async def proxy_openai_api(request: Request):
 
     async def update_log():
         nonlocal log
-        log.response_duration = time.time() - start_time_in_secs
-        await save_log(log)
+        try:
+            log.response_duration = time.time() - start_time_in_secs
+            await save_log(log)
+        except Exception as e:
+            # Log the error to the console or a file
+            print(f"Error saving log: {e}")
 
     response = OverrideStreamResponse(stream_api_response(), background=BackgroundTask(update_log))
     return response

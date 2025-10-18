@@ -58,7 +58,7 @@ class PathMatchingTree:
                 matched = matched.child['*']
             else:
                 break
-        return matched.value
+        return matched.value.rstrip('/')
 
 
 class OverrideStreamResponse(StreamingResponse):

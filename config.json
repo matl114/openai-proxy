@@ -1,0 +1,6 @@
+{
+  "proxied_hosts": {
+    "/": "https://api.openai.com",
+    "/backend-api/conversation": "https://chat.openai.com"
+  }
+}

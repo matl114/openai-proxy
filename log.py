@@ -1,12 +1,10 @@
-import databases
-
-from sqlalchemy import create_engine, Column, Integer, String, BigInteger
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import Column, Integer, String, BigInteger
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.orm import declarative_base, sessionmaker
 
 # database config
-DATABASE_URL = 'sqlite:///./openai_log.db'
-database = databases.Database(DATABASE_URL)
+DATABASE_URL = 'sqlite+aiosqlite:///./openai_log.db'
+engine = create_async_engine(DATABASE_URL)
 Base = declarative_base()
 
 
@@ -49,12 +47,14 @@ class OpenAILog(Base):
         }
 
 
-engine = create_engine(DATABASE_URL)
-Base.metadata.create_all(bind=engine)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+async def create_tables():
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+SessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
 async def save_log(log: OpenAILog):
-    async with database.transaction():
-        query = OpenAILog.__table__.insert().values(**log.to_dict())
-        await database.execute(query)
+    async with SessionLocal() as session:
+        session.add(log)
+        await session.commit()
