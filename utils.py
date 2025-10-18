@@ -6,6 +6,7 @@ from fastapi.responses import StreamingResponse
 from starlette.types import Send, Scope, Receive
 
 
+
 class PathMatchingTree:
     """
     PathMatchingTree is a data structure that can be used to match a path with a value.

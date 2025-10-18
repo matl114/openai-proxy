@@ -7,12 +7,11 @@ import httpx
 from fastapi import FastAPI, Request, HTTPException
 from starlette.background import BackgroundTask
 
+from config import proxied_hosts_config
 from log import OpenAILog, save_log, create_tables
 from utils import PathMatchingTree, OverrideStreamResponse
 
-with open('config.json') as f:
-    config = json.load(f)
-proxied_hosts = PathMatchingTree(config['proxied_hosts'])
+proxied_hosts = PathMatchingTree(proxied_hosts_config)
 
 
 # httpx client that is managed by the application's lifespan
