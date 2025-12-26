@@ -7,7 +7,7 @@ import httpx
 from fastapi import FastAPI, Request, HTTPException
 from starlette.background import BackgroundTask
 
-from config import proxied_hosts_config
+from config import proxied_hosts_config, proxied_model_name_mapping, service_port, auto_reload
 from log import OpenAILog, save_log, create_tables
 from utils import PathMatchingTree, OverrideStreamResponse
 
@@ -42,8 +42,20 @@ async def proxy_openai_api(request: Request):
         request_body = await request.json() if request.method in {'POST', 'PUT'} else None
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail='Invalid JSON body')
-
     log = OpenAILog()
+    
+
+    if request_body and 'model' in request_body:
+        client_model = request_body['model']
+    
+        target_model = proxied_model_name_mapping.get(client_model)
+        if target_model:
+            # 执行映射
+            request_body['model'] = target_model
+            print(f"Mapping model {client_model} -> {target_model}")
+        else:
+            print(f"Mapping model absent for {client_model}")
+           
 
     async def stream_api_response():
         nonlocal log
@@ -92,4 +104,4 @@ async def request_handler(request: Request):
 if __name__ == '__main__':
     import uvicorn
 
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, log_level="info", reload=True)
+    uvicorn.run("main:app", host="127.0.0.1", port= service_port, log_level="info", reload=auto_reload)

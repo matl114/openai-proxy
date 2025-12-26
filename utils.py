@@ -94,7 +94,8 @@ class OverrideStreamResponse(StreamingResponse):
         async with anyio.create_task_group() as task_group:
             async def wrap(func: typing.Callable[[], typing.Coroutine]) -> None:
                 await func()
-                await task_group.cancel_scope.cancel()
+                if task_group.cancel_scope :
+                    await task_group.cancel_scope.cancel()
 
             task_group.start_soon(wrap, partial(self.stream_response, send))
             await wrap(partial(self.listen_for_disconnect, receive))
